@@ -1,5 +1,9 @@
 # gda-test-webkit
 
+## TODO
+
+- Appunti Errore Download [link](http://stackoverflow.com/questions/16278747/error-downloading)
+
 ## Compilazione
 
 Richiede in sotto cartella
