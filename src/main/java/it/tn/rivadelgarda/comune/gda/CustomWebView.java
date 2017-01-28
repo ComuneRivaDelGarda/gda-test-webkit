@@ -1,7 +1,11 @@
 package it.tn.rivadelgarda.comune.gda;
 
+import com.trolltech.qt.core.QUrl;
 import com.trolltech.qt.gui.QWidget;
+import com.trolltech.qt.network.QNetworkAccessManager;
 import com.trolltech.qt.network.QNetworkCookieJar;
+import com.trolltech.qt.network.QNetworkReply;
+import com.trolltech.qt.network.QNetworkRequest;
 import com.trolltech.qt.webkit.QWebPage;
 import com.trolltech.qt.webkit.QWebSettings;
 import com.trolltech.qt.webkit.QWebView;
@@ -19,10 +23,13 @@ public class CustomWebView extends QWebView {
 
     public CustomWebView(QWidget parent) {
         super(parent);
-        this.cookieJar = new QNetworkCookieJar();
-        this.page().networkAccessManager().setCookieJar(this.cookieJar);
-        this.page().loadFinished.connect(this, "loadFinished()");
-        this.page().windowCloseRequested.connect(this, "close()");
+        cookieJar = new QNetworkCookieJar();
+        QWebPage page = page();
+        page.networkAccessManager().setCookieJar(cookieJar);
+        page.loadFinished.connect(this, "loadFinished()");
+        page.windowCloseRequested.connect(this, "close()");
+        page.setLinkDelegationPolicy(QWebPage.LinkDelegationPolicy.DelegateAllLinks);
+        page.linkClicked.connect(this, "linkFilter(QUrl)");
 
         settings().globalSettings().setAttribute(QWebSettings.WebAttribute.DeveloperExtrasEnabled, true);
     }
@@ -30,9 +37,40 @@ public class CustomWebView extends QWebView {
     @Override
     protected QWebView createWindow(QWebPage.WebWindowType type) {
         CustomWebView view = new CustomWebView();
-        view.page().networkAccessManager().setCookieJar(this.cookieJar);
+        view.page().networkAccessManager().setCookieJar(cookieJar);
         view.show();
         return view;
+    }
+
+    private void linkFilter(QUrl url){
+
+        QNetworkAccessManager manager = page().networkAccessManager();
+        QNetworkRequest request = new QNetworkRequest(url);
+
+        QNetworkReply headerReply = manager.head(request);
+        headerReply.finished.connect(this, "checkHeaders()");
+    }
+
+    private void checkHeaders(){
+        QNetworkReply headerReply = (QNetworkReply) signalSender();
+        QUrl url = headerReply.url();
+        String contentType = (String) headerReply.header(QNetworkRequest.KnownHeaders.ContentTypeHeader);
+        System.out.println("Content-Type: '" + contentType + "'");
+        if( "application/pdf".equals(contentType) ){
+            QNetworkAccessManager manager = headerReply.manager();
+            QNetworkRequest request = new QNetworkRequest(url);
+            QNetworkReply reply = manager.get(request);
+            reply.finished.connect(this, "downloadFile()");
+        } else {
+            setUrl(url);
+        }
+    }
+
+    private void downloadFile(){
+        System.out.println("Stai scaricando un pdf!!");
+        QNetworkReply reply = (QNetworkReply) signalSender();
+        byte[] bytes = reply.readAll().toByteArray();
+        System.out.println("Size: " + bytes.length);
     }
 
     private void loadFinished(){
